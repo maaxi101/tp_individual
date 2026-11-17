@@ -1,7 +1,6 @@
 {
-  "name": "dds-repo-base",
+  "name": "ai-ticket-it",
   "version": "1.0.0",
-  "main": "index.js",
   "workspaces": [
     "packages/*"
   ],
@@ -10,6 +9,7 @@
     "dev:backend": "npm run dev --workspace=backend",
     "start:frontend": "npm start --workspace=frontend",
     "start:dev": "concurrently \"npm run dev:backend\" \"npm run start:frontend\"",
+    "test": "npm test --workspace=backend",
     "lint": "eslint .",
     "format": "prettier . --write"
   },
@@ -24,5 +24,6 @@
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.3.0",
     "prettier": "3.6.2"
-  }
+  },
+  "private": true
 }

@@ -1,21 +1,24 @@
 import "dotenv/config";
-import express from "express";
-import cors from "cors";
+import os from "node:os";
+import { crearApp } from "./src/app.js";
 
-const app = express();
-app.use(express.json());
-app.use(
-  cors({
-    origin: process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-      : true,
-  }),
-);
+const puerto = Number(process.env.SERVER_PORT) || 8000;
 
-app.get("/hello", (req, res) => {
-  res.json({ message: "hello world" });
-});
+// IPs de la red local: la app móvil tiene que apuntar a una de estas
+function ipsLocales() {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter((red) => red.family === "IPv4" && !red.internal)
+    .map((red) => red.address);
+}
 
-app.listen(process.env.SERVER_PORT, () => {
-  console.log(`Backend escuchando en puerto ${process.env.SERVER_PORT}`);
+const app = await crearApp();
+
+// 0.0.0.0 para aceptar conexiones del celular en la misma red
+app.listen(puerto, "0.0.0.0", () => {
+  console.log(`Backend escuchando en http://localhost:${puerto}`);
+  for (const ip of ipsLocales()) {
+    console.log(`  desde el celular: http://${ip}:${puerto}`);
+  }
+  console.log(`  documentación:    http://localhost:${puerto}/api-docs`);
 });

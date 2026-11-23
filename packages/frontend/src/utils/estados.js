@@ -5,6 +5,7 @@ export const ESTADOS = {
   UTILIZADA: { etiqueta: "Utilizada", color: "#1D4ED8", fondo: "#DBEAFE" },
   CANCELADA: { etiqueta: "Cancelada", color: "#4B5563", fondo: "#F3F4F6" },
   REEMBOLSADA: { etiqueta: "Reembolsada", color: "#6D28D9", fondo: "#EDE9FE" },
+  VENCIDA: { etiqueta: "Vencida", color: "#B91C1C", fondo: "#FEE2E2" },
 };
 
 export function infoEstado(estado) {

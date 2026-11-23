@@ -4,4 +4,5 @@ export const EstadoCompra = Object.freeze({
   UTILIZADA: "UTILIZADA",
   CANCELADA: "CANCELADA",
   REEMBOLSADA: "REEMBOLSADA",
+  VENCIDA: "VENCIDA",
 });

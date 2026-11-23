@@ -1,3 +1,4 @@
+import { EstadoCompra } from "../../domain/EstadoCompra.js";
 import { usuarioDTO } from "../usuario/usuarioDTO.js";
 
 // Además de dar forma a la respuesta, evita exponer la referencia
@@ -19,12 +20,16 @@ export const compraDTO = (compra) => ({
   cantidad: compra.cantidad,
   total: compra.total,
   estado: compra.estado,
+  // hasta cuándo se puede pagar; la app arma la cuenta regresiva con esto
+  venceEn:
+    compra.estado === EstadoCompra.PENDIENTE ? compra.venceEn.toISOString() : null,
   diasParaEvento: compra.diasParaEvento(),
   puedeCancelarse: compra.puedeCancelarse(),
   puedeSerReseniada: compra.puedeSerReseniada(),
   historial: compra.cambiosEstado.map((cambio) => ({
     estado: cambio.estado,
-    quien: usuarioDTO(cambio.quien),
+    // null cuando el cambio lo hizo el sistema (vencimiento de la reserva)
+    quien: cambio.quien ? usuarioDTO(cambio.quien) : null,
     fechaHora: cambio.fechaHora.toISOString(),
   })),
 });

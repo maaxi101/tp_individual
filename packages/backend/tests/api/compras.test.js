@@ -1,9 +1,15 @@
 import request from "supertest";
 import { crearApp } from "../../src/app.js";
+import { Evento } from "../../src/domain/Evento.js";
+import { TipoEntrada } from "../../src/domain/TipoEntrada.js";
+import { Usuario } from "../../src/domain/Usuario.js";
+import { CompraRepository } from "../../src/repositories/CompraRepository.js";
+import { EventoRepository } from "../../src/repositories/EventoRepository.js";
+import { CompraService } from "../../src/services/CompraService.js";
 
 // Seed: usuarios 1 Ana, 2 Martín (organizadores), 3 Juan, 4 Lucía.
 // Compras: 1 Juan/Rock CONFIRMADA, 2 Juan/Hamlet PENDIENTE, 3 Juan/Jazz UTILIZADA,
-// 5 Lucía/Conferencia CONFIRMADA, 7 Lucía/StandUp UTILIZADA (sin reseñar).
+// 5 Lucía/Conferencia CONFIRMADA, 7 Lucía/StandUp UTILIZADA (sin reseñar), 8 Lucía/Hamlet VENCIDA.
 // Tipos de entrada: 1 Rock General (500), 2 Rock VIP (50), 7 Básquet Popular (1000), 9 Jazz General.
 let app;
 
@@ -228,5 +234,79 @@ describe("listados", () => {
     const res = await como(3)(request(app).get("/eventos/1/compras"));
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe("vencimiento de reservas", () => {
+  test("el detalle de una compra pendiente informa hasta cuándo se puede pagar", async () => {
+    const res = await como(3)(request(app).get("/compras/2"));
+
+    expect(res.body.estado).toBe("PENDIENTE");
+    expect(new Date(res.body.venceEn).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test("la compra vencida del seed figura VENCIDA, sin venceEn y registrada por el sistema", async () => {
+    const res = await como(4)(request(app).get("/compras/8"));
+
+    expect(res.body.estado).toBe("VENCIDA");
+    expect(res.body.venceEn).toBeNull();
+    expect(res.body.historial.at(-1)).toMatchObject({ estado: "VENCIDA", quien: null });
+  });
+
+  test("las compras del organizador vienen de la más nueva a la más vieja", async () => {
+    const res = await como(1)(request(app).get("/eventos/1/compras"));
+    const ids = res.body.compras.map((c) => c.id);
+
+    expect(ids).toEqual([...ids].sort((a, b) => b - a));
+  });
+
+  describe("con reservas de 0 minutos (vencen enseguida)", () => {
+    let appVence;
+
+    beforeAll(async () => {
+      appVence = await crearApp({ logs: false, minutosReserva: 0 });
+    });
+
+    const comprarGeneralRock = () =>
+      como(3)(request(appVence).post("/compras")).send({
+        eventoId: 1,
+        tipoEntradaId: 1,
+        cantidad: 5,
+      });
+
+    test("pagar una reserva vencida da 409, la deja VENCIDA y repone el cupo", async () => {
+      const compra = await comprarGeneralRock();
+      expect(compra.status).toBe(201);
+
+      const pago = await como(3)(request(appVence).post(`/compras/${compra.body.id}/confirmar`));
+      expect(pago.status).toBe(409);
+      expect(pago.body.error).toMatch(/venció/);
+
+      const detalle = await como(3)(request(appVence).get(`/compras/${compra.body.id}`));
+      expect(detalle.body.estado).toBe("VENCIDA");
+      const evento = await request(appVence).get("/eventos/1");
+      expect(evento.body.tiposEntrada[0].cupoDisponible).toBe(498);
+    });
+
+    test("el job vence todas las reservas expiradas", async () => {
+
+      const compraRepository = new CompraRepository();
+      const eventoRepository = new EventoRepository();
+      const service = new CompraService(compraRepository, eventoRepository, { minutosReserva: 10 });
+      const tipo = new TipoEntrada("General", "", 100, 10);
+      tipo.id = 1;
+      const evento = new Evento("E", "", null, new Date(Date.now() + 864e5), [tipo], [], new Usuario("A", "B"));
+      await eventoRepository.guardar(evento);
+      const comprador = new Usuario("J", "P");
+      for (let i = 0; i < 3; i++) {
+        await service.comprar(comprador, { eventoId: evento.id, tipoEntradaId: 1, cantidad: 2 });
+      }
+      expect(tipo.cupo).toBe(4);
+
+      expect(await service.vencerReservasExpiradas()).toBe(0);
+      const enOnceMinutos = new Date(Date.now() + 11 * 60 * 1000);
+      expect(await service.vencerReservasExpiradas(enOnceMinutos)).toBe(3);
+      expect(tipo.cupo).toBe(10);
+    });
   });
 });

@@ -97,7 +97,8 @@ export function ComprarScreen({ route, navigation }) {
         deshabilitado={!tipo || maximo === 0}
       />
       <Text style={estilos.nota}>
-        La compra queda pendiente de pago hasta que la confirmes desde “Mis compras”.
+        Las entradas quedan reservadas por unos minutos hasta que pagues. Si no pagás a
+        tiempo, la reserva vence y las entradas se liberan.
       </Text>
     </Pantalla>
   );

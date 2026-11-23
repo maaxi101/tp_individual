@@ -17,6 +17,8 @@ function enDias(dias, hora = 21) {
   return fecha;
 }
 
+const MINUTOS_EN_UN_DIA = 24 * 60;
+
 // para eventos pasados no se puede usar evento.venderEntradas()
 function compraHistorica(comprador, evento, tipoEntrada, cantidad) {
   tipoEntrada.descontarCupo(cantidad);
@@ -123,12 +125,21 @@ export async function cargarDatosIniciales({
     new Mensaje(juan, "Hola, ¿a qué hora abren las puertas?"),
     new Mensaje(ana, "¡Hola Juan! Las puertas abren a las 19 hs."),
   );
-  const juanHamlet = hamlet.venderEntradas(juan, hamlet.tiposEntrada[0].id, 1);
+  // reserva de 24 h (en vez de RESERVA_MINUTOS) para que siga pendiente toda la demo
+  const juanHamlet = hamlet.venderEntradas(
+    juan,
+    hamlet.tiposEntrada[0].id,
+    1,
+    MINUTOS_EN_UN_DIA,
+  );
   const juanJazz = compraHistorica(juan, jazz, jazz.tiposEntrada[0], 2);
   juanJazz.confirmar(juan);
   juanJazz.utilizar(ana);
 
-  // Lucía: reembolsada, confirmada, utilizada reseñada y una utilizada sin reseñar
+  // Lucía: reembolsada, confirmada, utilizada reseñada, una utilizada sin reseñar
+  // y una reserva que venció sin pagarse
+  const luciaHamlet = hamlet.venderEntradas(lucia, hamlet.tiposEntrada[1].id, 2, 0);
+  luciaHamlet.vencerSiExpiro();
   const luciaRock = rock.venderEntradas(lucia, rock.tiposEntrada[1].id, 1);
   luciaRock.confirmar(lucia);
   luciaRock.cancelar(lucia);
@@ -153,6 +164,7 @@ export async function cargarDatosIniciales({
     luciaConferencia,
     luciaJazz,
     luciaStandUp,
+    luciaHamlet,
   ]) {
     await compraRepository.guardar(compra);
   }

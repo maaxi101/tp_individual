@@ -41,7 +41,7 @@ export function ComprasDeEventoScreen({ route, navigation }) {
         <Text style={estilos.recaudado}>Cobrado: {formatearPrecio(totalRecaudado)}</Text>
       </Seccion>
 
-      <Seccion titulo={`Compras (${datos.compras.length})`}>
+      <Seccion titulo={`Compras (${datos.compras.length}) · más nuevas primero`}>
         {datos.compras.length === 0 ? (
           <Vacio titulo="Todavía no hay compras" />
         ) : (
@@ -52,7 +52,10 @@ export function ComprasDeEventoScreen({ route, navigation }) {
               style={({ pressed }) => [estilos.compra, pressed && estilos.presionada]}
             >
               <View style={estilos.compraInfo}>
-                <Text style={estilos.comprador}>{nombreCompleto(compra.comprador)}</Text>
+                <Text style={estilos.comprador}>
+                  <Text style={estilos.numero}>#{compra.id} </Text>
+                  {nombreCompleto(compra.comprador)}
+                </Text>
                 <Text style={estilos.detalle}>
                   {compra.tipoEntrada.nombre} × {compra.cantidad} · {formatearPrecio(compra.total)}
                 </Text>
@@ -83,6 +86,7 @@ const estilos = StyleSheet.create({
   presionada: { backgroundColor: colores.fondo },
   compraInfo: { flex: 1, marginRight: espaciado.s },
   comprador: { fontWeight: "700", color: colores.texto },
+  numero: { color: colores.textoSecundario, fontWeight: "600" },
   detalle: { color: colores.textoSecundario, fontSize: 13, marginTop: 2 },
   error: { margin: espaciado.m },
 });

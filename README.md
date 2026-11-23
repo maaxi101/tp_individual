@@ -70,7 +70,7 @@ No hay login: al abrir la app se elige con qué usuario operar y ese id viaja en
 | 1 | Ana García | Organiza Noche de Rock Nacional, Final Liga de Básquet y Jazz en el Parque (pasado) |
 | 2 | Martín López | Organiza Hamlet, Conferencia JS Argentina y Stand Up de Primavera (pasado) |
 | 3 | Juan Pérez | Compras: Rock (confirmada, con chat), Hamlet (pendiente de pago), Jazz (utilizada y reseñada) |
-| 4 | Lucía Fernández | Compras: Rock (reembolsada), Conferencia (confirmada), Jazz (utilizada y reseñada), Stand Up (utilizada, sin reseñar) |
+| 4 | Lucía Fernández | Compras: Rock (reembolsada), Conferencia (confirmada), Jazz (utilizada y reseñada), Stand Up (utilizada, sin reseñar), Hamlet (vencida sin pagar) |
 
 Los datos se cargan en memoria al iniciar el backend (`src/data/datosIniciales.js`) y se pierden al reiniciarlo.
 
@@ -103,10 +103,21 @@ ruta (src/routes)  →  middlewares (autenticar, validarSchema)  →  controller
 ```
 PENDIENTE ──confirmar (comprador paga)──▶ CONFIRMADA ──utilizar (organizador)──▶ UTILIZADA ──▶ se puede reseñar
     │                                         │
-    └── cancelar ──▶ CANCELADA                └── cancelar ──▶ CANCELADA ──▶ REEMBOLSADA
+    ├── cancelar ──▶ CANCELADA                └── cancelar ──▶ CANCELADA ──▶ REEMBOLSADA
+    │
+    └── no paga a tiempo ──▶ VENCIDA
 ```
 
 Cancelar repone el cupo. No se puede cancelar una compra utilizada ni una de un evento que ya se realizó. Cada cambio queda registrado en el historial con quién lo hizo y cuándo.
+
+### Vencimiento de reservas
+
+Una compra PENDIENTE reserva el cupo durante `RESERVA_MINUTOS` (10 por defecto, en `packages/backend/.env`). Si no se paga a tiempo pasa a **VENCIDA** y el cupo se libera.
+
+- **La fuente de verdad es la fecha `venceEn`**, que guarda el servidor al crear la compra. `Compra.confirmar()` la verifica: un pago tardío se rechaza (409) aunque la compra todavía figure PENDIENTE.
+- **Vencimiento perezoso:** el service vence las reservas expiradas cada vez que lee una compra (detalle, listados, pagar y comprar). Nunca se muestra ni se paga una reserva vencida.
+- **Job** (`src/jobs/vencimientoReservas.js`): cada 30 s vence las reservas expiradas para liberar el cupo aunque nadie las consulte. En el historial el cambio figura hecho por "Sistema".
+- **La app** solo muestra la cuenta regresiva calculada desde `venceEn`. Cerrar la app no detiene ni reinicia el plazo.
 
 ### Endpoints
 
@@ -162,8 +173,8 @@ packages/frontend/
 | Explorar | Buscar por texto, filtrar por categoría, ordenar por precio, fecha o puntaje |
 | Evento | Tipos de entrada con precio y cupo, puntaje y reseñas del organizador, favorito |
 | Comprar | Elegir tipo y cantidad sin superar el cupo |
-| Mis compras | Estado de cada compra y días que faltan si está confirmada |
-| Compra | Pagar, cancelar (reembolso), marcar utilizada (organizador), reseñar, historial |
+| Mis compras | Estado de cada compra, días que faltan si está confirmada, vencimiento si está pendiente y filtro por estado |
+| Compra | Cuenta regresiva de la reserva, pagar, cancelar (reembolso), marcar utilizada (organizador), reseñar, historial |
 | Chat | Mensajes entre comprador y organizador |
 | Reseñar | Puntaje 1 a 5 y comentario |
 | Mis eventos / Nuevo evento | Crear eventos con varios tipos de entrada |
@@ -171,7 +182,7 @@ packages/frontend/
 
 ## Flujo sugerido para la demo
 
-1. Entrar como **Juan** (3). Explorar → Noche de Rock Nacional → Comprar 2 General → Pagar. La compra pasa a CONFIRMADA y muestra cuántos días faltan.
+1. Entrar como **Juan** (3). Explorar → Noche de Rock Nacional → Comprar 2 **VIP** (Juan ya tiene General de los datos de ejemplo). La compra (#9) queda PENDIENTE con la cuenta regresiva de la reserva → Pagar. Pasa a CONFIRMADA y muestra cuántos días faltan.
 2. Abrir el chat y enviar una consulta.
-3. Cambiar a **Ana** (1). Mis eventos → Noche de Rock → Ver compras: aparece la compra de Juan y el cupo actualizado. Responder el chat y marcar la entrada como utilizada.
+3. Cambiar a **Ana** (1). Mis eventos → Noche de Rock → Ver compras: la compra #9 de Juan aparece primera (más nuevas arriba) y el cupo VIP actualizado. Responder el chat y marcar la entrada como utilizada.
 4. Volver a **Juan**: la compra está UTILIZADA y permite dejar una reseña, que luego se ve en todos los eventos de Ana.

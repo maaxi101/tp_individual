@@ -8,4 +8,11 @@ export class CompraRepository extends InMemoryRepository {
   async buscarPorEvento(eventoId) {
     return this.buscarDonde((compra) => compra.evento.id === eventoId);
   }
+
+  // En memoria recorre todo; con una base de datos sería
+  // WHERE estado = 'PENDIENTE' AND vence_en <= now() sobre un índice
+  // (estado, vence_en), que solo toca las filas vencidas.
+  async buscarPendientesVencidas(ahora = new Date()) {
+    return this.buscarDonde((compra) => compra.estaVencida(ahora));
+  }
 }

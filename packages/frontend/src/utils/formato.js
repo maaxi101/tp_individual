@@ -32,11 +32,24 @@ export function textoDiasParaEvento(dias) {
   return `Faltan ${dias} días`;
 }
 
+// 581000 -> "9:41"
+export function formatearTiempoRestante(ms) {
+  const segundos = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(segundos / 60)}:${dosDigitos(segundos % 60)}`;
+}
+
+// minutos (redondeados hacia arriba) que faltan para una fecha ISO
+export function minutosRestantes(iso) {
+  return Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 60000));
+}
+
 export function yaPaso(iso) {
   return new Date(iso) <= new Date();
 }
 
+// usuario null = cambio hecho por el sistema (ej: vencimiento de una reserva)
 export function nombreCompleto(usuario) {
+  if (!usuario) return "Sistema";
   return `${usuario.nombre} ${usuario.apellido}`;
 }
 

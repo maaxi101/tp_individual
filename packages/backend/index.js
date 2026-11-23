@@ -1,6 +1,6 @@
 import "dotenv/config";
 import os from "node:os";
-import { crearApp } from "./src/app.js";
+import { crearApp, minutosReservaDelEntorno } from "./src/app.js";
 
 const puerto = Number(process.env.SERVER_PORT) || 8000;
 
@@ -12,7 +12,7 @@ function ipsLocales() {
     .map((red) => red.address);
 }
 
-const app = await crearApp();
+const app = await crearApp({ jobs: true });
 
 // 0.0.0.0 para aceptar conexiones del celular en la misma red
 app.listen(puerto, "0.0.0.0", () => {
@@ -21,4 +21,5 @@ app.listen(puerto, "0.0.0.0", () => {
     console.log(`  desde el celular: http://${ip}:${puerto}`);
   }
   console.log(`  documentación:    http://localhost:${puerto}/api-docs`);
+  console.log(`  reservas:         vencen a los ${minutosReservaDelEntorno()} min sin pagar`);
 });

@@ -18,7 +18,7 @@ export function crearRutasCompras(
    * @swagger
    * /compras:
    *   post:
-   *     summary: Compra entradas de un evento (queda PENDIENTE de pago)
+   *     summary: "Compra entradas de un evento. Queda PENDIENTE y reserva el cupo durante RESERVA_MINUTOS (ver venceEn)."
    *     tags: [Compras]
    *     security: [{ usuario: [] }]
    *     requestBody:
@@ -61,7 +61,7 @@ export function crearRutasCompras(
    * @swagger
    * /compras/{id}/confirmar:
    *   post:
-   *     summary: "Paga la compra (PENDIENTE a CONFIRMADA). Solo el comprador."
+   *     summary: "Paga la compra (PENDIENTE a CONFIRMADA) antes de que venza la reserva. Solo el comprador."
    *     tags: [Compras]
    *     security: [{ usuario: [] }]
    *     parameters:
@@ -70,7 +70,7 @@ export function crearRutasCompras(
    *       200:
    *         description: Compra confirmada
    *       409:
-   *         description: La compra no está pendiente
+   *         description: La compra no está pendiente o la reserva venció
    */
   router.post("/:id/confirmar", compraController.confirmar);
 

@@ -80,6 +80,7 @@ export function ExplorarScreen({ navigation }) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={estilos.chipsScroll}
         contentContainerStyle={estilos.chips}
       >
         <ChipCategoria
@@ -150,7 +151,9 @@ const estilos = StyleSheet.create({
     borderColor: colores.borde,
   },
   input: { flex: 1, paddingVertical: 12, paddingLeft: espaciado.s, fontSize: 16, color: colores.texto },
-  chips: { paddingHorizontal: espaciado.m, paddingVertical: espaciado.m },
+  // sin esto el ScrollView toma flex: se estira con pocos eventos y se aplasta con muchos
+  chipsScroll: { flexGrow: 0, flexShrink: 0 },
+  chips: { paddingHorizontal: espaciado.m, paddingVertical: espaciado.m, alignItems: "center" },
   ordenFila: {
     flexDirection: "row",
     alignItems: "center",

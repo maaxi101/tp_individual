@@ -138,6 +138,64 @@ describe("Dominio: Compra", () => {
     expect(compra.puedeSerReseniada()).toBe(true);
   });
 
+  describe("vencimiento de la reserva", () => {
+    const enMinutos = (minutos) => new Date(Date.now() + minutos * 60 * 1000);
+
+    test("nace con venceEn = creada + minutos de reserva", () => {
+      const { comprador, tipo, evento } = armarEscenario();
+      const compra = new Compra(comprador, evento, tipo, 1, 15);
+
+      expect(compra.venceEn - compra.creada).toBe(15 * 60 * 1000);
+      expect(compra.estaVencida()).toBe(false);
+      expect(compra.estaVencida(enMinutos(16))).toBe(true);
+    });
+
+    test("vencerSiExpiro la pasa a VENCIDA, repone el cupo y la registra el sistema", () => {
+      const { comprador, tipo, evento } = armarEscenario({ cupo: 10 });
+      const compra = evento.venderEntradas(comprador, tipo.id, 4, 10);
+      expect(tipo.cupo).toBe(6);
+
+      expect(compra.vencerSiExpiro()).toBe(false);
+      expect(compra.vencerSiExpiro(enMinutos(11))).toBe(true);
+
+      expect(compra.estado).toBe(EstadoCompra.VENCIDA);
+      expect(tipo.cupo).toBe(10);
+      expect(compra.cambiosEstado.at(-1).quien).toBeNull();
+      // vencer dos veces no repone el cupo de nuevo
+      expect(compra.vencerSiExpiro(enMinutos(20))).toBe(false);
+      expect(tipo.cupo).toBe(10);
+    });
+
+    test("una compra ya pagada no vence", () => {
+      const { comprador, tipo, evento } = armarEscenario();
+      const compra = evento.venderEntradas(comprador, tipo.id, 1, 10);
+      compra.confirmar(comprador);
+
+      expect(compra.vencerSiExpiro(enMinutos(60))).toBe(false);
+      expect(compra.estado).toBe(EstadoCompra.CONFIRMADA);
+    });
+
+    test("pagar después de venceEn falla aunque el job todavía no la haya marcado", () => {
+      const { comprador, tipo, evento } = armarEscenario();
+      const compra = evento.venderEntradas(comprador, tipo.id, 1, 10);
+
+      // sigue PENDIENTE porque nadie la venció, pero la fecha ya pasó
+      expect(compra.estado).toBe(EstadoCompra.PENDIENTE);
+      expect(() => compra.confirmar(comprador, enMinutos(11))).toThrow("venció");
+      expect(compra.estado).toBe(EstadoCompra.PENDIENTE);
+    });
+
+    test("una reserva vencida no se puede pagar ni cancelar", () => {
+      const { comprador, tipo, evento } = armarEscenario();
+      const compra = evento.venderEntradas(comprador, tipo.id, 1, 0);
+      compra.vencerSiExpiro();
+
+      expect(() => compra.confirmar(comprador)).toThrow("venció");
+      expect(compra.puedeCancelarse()).toBe(false);
+      expect(() => compra.cancelar(comprador)).toThrow("venció");
+    });
+  });
+
   test("participan de la compra el comprador y el organizador del evento", () => {
     const { organizador, comprador, tipo, evento } = armarEscenario();
     const compra = new Compra(comprador, evento, tipo, 1);

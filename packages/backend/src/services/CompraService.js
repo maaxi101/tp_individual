@@ -1,12 +1,22 @@
+import { Compra } from "../domain/Compra.js";
 import { ForbiddenError } from "../errors/index.js";
 import { buscarOFallar } from "./helpers.js";
 
 // Los datos de entrada ya vienen con la forma correcta (validarSchema);
 // acá solo viven las reglas de negocio: existencia, permisos, estados y cupo.
+//
+// Vencimiento de reservas: se aplica de forma perezosa cada vez que se lee
+// una compra (así nunca se muestra ni se paga una reserva vencida) y además
+// un job llama a vencerReservasExpiradas() para liberar el cupo en segundo plano.
 export class CompraService {
-  constructor(compraRepository, eventoRepository) {
+  constructor(
+    compraRepository,
+    eventoRepository,
+    { minutosReserva = Compra.MINUTOS_RESERVA } = {},
+  ) {
     this.compraRepository = compraRepository;
     this.eventoRepository = eventoRepository;
+    this.minutosReserva = minutosReserva;
   }
 
   async comprar(comprador, { eventoId, tipoEntradaId, cantidad }) {
@@ -15,7 +25,16 @@ export class CompraService {
       eventoId,
       "el evento",
     );
-    const compra = evento.venderEntradas(comprador, tipoEntradaId, cantidad);
+    // libera el cupo de las reservas vencidas antes de verificar disponibilidad
+    await this.#vencerExpiradas(
+      await this.compraRepository.buscarPorEvento(eventoId),
+    );
+    const compra = evento.venderEntradas(
+      comprador,
+      tipoEntradaId,
+      cantidad,
+      this.minutosReserva,
+    );
     await this.eventoRepository.guardar(evento);
     return this.compraRepository.guardar(compra);
   }
@@ -24,7 +43,9 @@ export class CompraService {
     if (usuario.id !== compradorId) {
       throw new ForbiddenError("Solo podés ver tus propias compras");
     }
-    return this.compraRepository.buscarPorComprador(compradorId);
+    const compras = await this.compraRepository.buscarPorComprador(compradorId);
+    await this.#vencerExpiradas(compras);
+    return compras;
   }
 
   async listarPorEvento(usuario, eventoId) {
@@ -39,6 +60,9 @@ export class CompraService {
       );
     }
     const compras = await this.compraRepository.buscarPorEvento(eventoId);
+    await this.#vencerExpiradas(compras);
+    // las más nuevas primero
+    compras.sort((a, b) => b.id - a.id);
     return { evento, compras };
   }
 
@@ -51,6 +75,7 @@ export class CompraService {
     if (!compra.esParticipante(usuario)) {
       throw new ForbiddenError("No participás de esta compra");
     }
+    await this.#vencerExpiradas([compra]);
     return compra;
   }
 
@@ -100,6 +125,24 @@ export class CompraService {
     const mensaje = compra.agregarMensaje(usuario, texto);
     await this.compraRepository.guardar(compra);
     return mensaje;
+  }
+
+  // Lo usa el job: vence todas las reservas expiradas y devuelve cuántas
+  async vencerReservasExpiradas(ahora = new Date()) {
+    const vencidas = await this.compraRepository.buscarPendientesVencidas(ahora);
+    return this.#vencerExpiradas(vencidas, ahora);
+  }
+
+  async #vencerExpiradas(compras, ahora = new Date()) {
+    let cantidad = 0;
+    for (const compra of compras) {
+      if (compra.vencerSiExpiro(ahora)) {
+        await this.eventoRepository.guardar(compra.evento);
+        await this.compraRepository.guardar(compra);
+        cantidad++;
+      }
+    }
+    return cantidad;
   }
 
   #exigirComprador(compra, usuario, motivo) {

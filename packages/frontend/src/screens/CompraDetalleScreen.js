@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { comprasApi } from "../api/comprasApi";
 import { Boton, Cargando, EstadoBadge, MensajeError, Pantalla, Seccion } from "../components";
 import { useUsuario } from "../context/UsuarioContext";
 import { useCargar } from "../hooks/useCargar";
+import { useCuentaRegresiva } from "../hooks/useCuentaRegresiva";
 import { colores, espaciado } from "../theme";
 import { infoEstado } from "../utils/estados";
 import {
   formatearFechaLarga,
   formatearPrecio,
+  formatearTiempoRestante,
   nombreCompleto,
   textoDiasParaEvento,
 } from "../utils/formato";
@@ -25,6 +27,21 @@ export function CompraDetalleScreen({ route, navigation }) {
     () => comprasApi.obtener(id),
     [id],
   );
+
+  // la cuenta regresiva sale de venceEn (lo manda el backend); al llegar a 0
+  // se recarga y el backend devuelve la compra ya VENCIDA
+  const restante = useCuentaRegresiva(compra?.venceEn);
+  const reservaExpirada = restante != null && restante <= 0;
+  useEffect(() => {
+    if (!reservaExpirada || compra?.estado !== "PENDIENTE") return undefined;
+    // reintenta por si el reloj del celular va unos segundos adelantado al del servidor
+    const timer = setTimeout(() => recargar({ silencioso: true }), 1500);
+    return () => clearTimeout(timer);
+  }, [reservaExpirada, compra, recargar]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: `Compra #${id}` });
+  }, [navigation, id]);
 
   const ejecutar = async (accion) => {
     setAccionando(true);
@@ -67,9 +84,30 @@ export function CompraDetalleScreen({ route, navigation }) {
 
   return (
     <Pantalla scroll>
-      {recienCreada ? (
+      {recienCreada && compra.estado === "PENDIENTE" ? (
         <View style={estilos.exito}>
-          <Text style={estilos.exitoTexto}>¡Compra registrada! Completá el pago para confirmarla.</Text>
+          <Text style={estilos.exitoTexto}>
+            ¡Entradas reservadas! Completá el pago antes de que venza la reserva.
+          </Text>
+        </View>
+      ) : null}
+
+      {compra.estado === "PENDIENTE" && restante != null && !reservaExpirada ? (
+        <View style={estilos.reserva}>
+          <Text style={estilos.reservaTexto}>
+            Tenés {formatearTiempoRestante(restante)} para pagar
+          </Text>
+          <Text style={estilos.reservaDetalle}>
+            Si no, la reserva vence y las entradas se liberan.
+          </Text>
+        </View>
+      ) : null}
+
+      {compra.estado === "VENCIDA" ? (
+        <View style={estilos.vencida}>
+          <Text style={estilos.vencidaTexto}>
+            La reserva venció sin pagarse y las entradas se liberaron.
+          </Text>
         </View>
       ) : null}
 
@@ -91,7 +129,7 @@ export function CompraDetalleScreen({ route, navigation }) {
       <MensajeError mensaje={errorAccion} />
 
       <View style={estilos.acciones}>
-        {esComprador && compra.estado === "PENDIENTE" ? (
+        {esComprador && compra.estado === "PENDIENTE" && !reservaExpirada ? (
           <Boton
             titulo={`Pagar ${formatearPrecio(compra.total)}`}
             cargando={accionando}
@@ -117,7 +155,9 @@ export function CompraDetalleScreen({ route, navigation }) {
         <Boton
           titulo={`Chat con ${chatTitulo}`}
           variante="secundario"
-          onPress={() => navigation.navigate("Chat", { compraId: id, titulo: chatTitulo })}
+          onPress={() =>
+            navigation.navigate("Chat", { compraId: id, titulo: `Compra #${id} · ${chatTitulo}` })
+          }
         />
         {esComprador && compra.puedeCancelarse ? (
           <Boton
@@ -166,6 +206,21 @@ const estilos = StyleSheet.create({
     marginBottom: espaciado.m,
   },
   exitoTexto: { color: colores.primarioOscuro, fontWeight: "600" },
+  reserva: {
+    backgroundColor: "#FEF3C7",
+    padding: espaciado.m,
+    borderRadius: 12,
+    marginBottom: espaciado.m,
+  },
+  reservaTexto: { color: "#B45309", fontWeight: "800", fontSize: 16 },
+  reservaDetalle: { color: "#B45309", marginTop: 2, fontSize: 13 },
+  vencida: {
+    backgroundColor: "#FEE2E2",
+    padding: espaciado.m,
+    borderRadius: 12,
+    marginBottom: espaciado.m,
+  },
+  vencidaTexto: { color: "#B91C1C", fontWeight: "600" },
   encabezado: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   nombre: { fontSize: 22, fontWeight: "800", color: colores.texto, flex: 1, marginRight: espaciado.s },
   fecha: { color: colores.textoSecundario, marginTop: 4 },

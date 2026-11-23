@@ -43,7 +43,7 @@ export class Evento {
     return this.tiposEntrada.find((tipo) => tipo.id === tipoEntradaId) ?? null;
   }
 
-  venderEntradas(comprador, tipoEntradaId, cantidad) {
+  venderEntradas(comprador, tipoEntradaId, cantidad, minutosReserva) {
     if (this.yaSeRealizo()) {
       throw new ConflictError("El evento ya se realizó");
     }
@@ -54,6 +54,6 @@ export class Evento {
       );
     }
     tipoEntrada.descontarCupo(cantidad);
-    return new Compra(comprador, this, tipoEntrada, cantidad);
+    return new Compra(comprador, this, tipoEntrada, cantidad, minutosReserva);
   }
 }
